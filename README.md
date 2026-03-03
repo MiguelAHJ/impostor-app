@@ -4,7 +4,7 @@
 
 ### El juego de roles sociales para jugar con amigos
 
-[![Download APK](https://img.shields.io/badge/⬇️%20Descargar%20para%20Android-APK-brightgreen?style=for-the-badge)](https://github.com/TU_USUARIO/TU_REPOSITORIO/releases/latest/download/impostor.apk)
+[![Download APK](https://img.shields.io/badge/⬇️%20Descargar%20para%20Android-APK-brightgreen?style=for-the-badge)](https://github.com/MiguelAHJ/impostor-app/releases/latest/download/impostor.apk)
 
 </div>
 
@@ -55,7 +55,7 @@ Todos los ajustes y participantes se guardan automáticamente para la siguiente 
 Requiere [Flutter](https://flutter.dev) instalado.
 
 ```bash
-git clone https://github.com/TU_USUARIO/TU_REPOSITORIO.git
+git clone https://github.com/MiguelAHJ/impostor-app.git
 cd secret_word_social
 flutter pub get
 flutter run

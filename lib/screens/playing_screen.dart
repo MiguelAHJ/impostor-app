@@ -89,7 +89,8 @@ class _PlayingScreenState extends State<PlayingScreen> {
         children: [
           Text(
             'Ronda ${game.roundNumber}',
-            style: AppTheme.bodyStyle(fontSize: 13, color: AppColors.mutedForeground),
+            style: AppTheme.bodyStyle(
+                fontSize: 13, color: AppColors.mutedForeground),
           ),
           const SizedBox(height: 24),
 
@@ -128,7 +129,9 @@ class _PlayingScreenState extends State<PlayingScreen> {
                             style: AppTheme.displayStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
-                              color: isLow ? AppColors.accent : AppColors.foreground,
+                              color: isLow
+                                  ? AppColors.accent
+                                  : AppColors.foreground,
                             ),
                           ),
                         ],
@@ -159,11 +162,17 @@ class _PlayingScreenState extends State<PlayingScreen> {
                   return Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: isFirst ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
-                      border: isFirst ? Border.all(color: AppColors.primary.withOpacity(0.3)) : null,
+                      color: isFirst
+                          ? AppColors.primary.withOpacity(0.15)
+                          : Colors.transparent,
+                      border: isFirst
+                          ? Border.all(
+                              color: AppColors.primary.withOpacity(0.3))
+                          : null,
                     ),
                     child: Row(
                       children: [
@@ -174,7 +183,9 @@ class _PlayingScreenState extends State<PlayingScreen> {
                             style: AppTheme.displayStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: isFirst ? AppColors.primary : AppColors.mutedForeground,
+                              color: isFirst
+                                  ? AppColors.primary
+                                  : AppColors.mutedForeground,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -184,13 +195,16 @@ class _PlayingScreenState extends State<PlayingScreen> {
                           p.name,
                           style: AppTheme.bodyStyle(
                             fontSize: 14,
-                            color: isFirst ? AppColors.primary : AppColors.mutedForeground,
+                            color: isFirst
+                                ? AppColors.primary
+                                : AppColors.mutedForeground,
                           ),
                         ),
                         if (isFirst) ...[
                           const Spacer(),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
@@ -240,11 +254,13 @@ class _PlayingScreenState extends State<PlayingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.people, size: 14, color: AppColors.mutedForeground),
+              const Icon(Icons.people,
+                  size: 14, color: AppColors.mutedForeground),
               const SizedBox(width: 4),
               Text(
                 '${alivePlayers.length} jugadores vivos',
-                style: AppTheme.bodyStyle(fontSize: 12, color: AppColors.mutedForeground),
+                style: AppTheme.bodyStyle(
+                    fontSize: 12, color: AppColors.mutedForeground),
               ),
             ],
           ),

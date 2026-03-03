@@ -166,7 +166,8 @@ class _VotingScreenState extends State<VotingScreen> {
               ),
             ),
           ],
-          if (!_confirmed) const CancelGameButton(),        ],
+          if (!_confirmed) const CancelGameButton(),
+        ],
       ),
     );
   }

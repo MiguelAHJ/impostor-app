@@ -27,8 +27,13 @@ class GameProvider extends ChangeNotifier {
   static const _lastImpostorHasClueKey = 'party-game-last-impostor-has-clue';
   final _random = Random();
 
-  static Future<({List<String> names, int impostors, bool showRole, bool impostorHasClue})?>
-      loadLastSession() async {
+  static Future<
+      ({
+        List<String> names,
+        int impostors,
+        bool showRole,
+        bool impostorHasClue
+      })?> loadLastSession() async {
     final prefs = await SharedPreferences.getInstance();
     final names = prefs.getStringList(_lastNamesKey);
     final impostors = prefs.getInt(_lastImpostorsKey);

@@ -89,11 +89,11 @@ class _SetupScreenState extends State<SetupScreen> {
 
     setState(() => _error = '');
     context.read<GameProvider>().startGame(
-      names,
-      _impostors,
-      showRoleOnElimination: _showRoleOnElimination,
-      impostorHasClue: _impostorHasClue,
-    );
+          names,
+          _impostors,
+          showRoleOnElimination: _showRoleOnElimination,
+          impostorHasClue: _impostorHasClue,
+        );
   }
 
   @override

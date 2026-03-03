@@ -45,7 +45,8 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
           // Progress
           Text(
             'Jugador ${index + 1} de ${players.length}',
-            style: AppTheme.bodyStyle(fontSize: 13, color: AppColors.mutedForeground),
+            style: AppTheme.bodyStyle(
+                fontSize: 13, color: AppColors.mutedForeground),
           ),
           const SizedBox(height: 8),
           ClipRRect(
@@ -76,12 +77,14 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
               children: [
                 Text(
                   player.name,
-                  style: AppTheme.displayStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                  style: AppTheme.displayStyle(
+                      fontSize: 24, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   'Pasa el dispositivo a ',
-                  style: AppTheme.bodyStyle(fontSize: 13, color: AppColors.mutedForeground),
+                  style: AppTheme.bodyStyle(
+                      fontSize: 13, color: AppColors.mutedForeground),
                 ),
                 Text(
                   player.name,
@@ -92,7 +95,6 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 if (!_revealed)
                   // Hidden - tap to reveal
                   GestureDetector(
@@ -135,7 +137,8 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isImpostor ? AppColors.impostor : AppColors.primary,
+                        color:
+                            isImpostor ? AppColors.impostor : AppColors.primary,
                         width: 2,
                       ),
                       color: isImpostor
@@ -143,7 +146,9 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                           : AppColors.primary.withOpacity(0.1),
                       boxShadow: [
                         BoxShadow(
-                          color: (isImpostor ? AppColors.impostor : AppColors.primary)
+                          color: (isImpostor
+                                  ? AppColors.impostor
+                                  : AppColors.primary)
                               .withOpacity(0.2),
                           blurRadius: 20,
                         ),
@@ -157,7 +162,9 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                             Icon(
                               Icons.visibility,
                               size: 20,
-                              color: isImpostor ? AppColors.impostor : AppColors.primary,
+                              color: isImpostor
+                                  ? AppColors.impostor
+                                  : AppColors.primary,
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -165,7 +172,9 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                               style: AppTheme.displayStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: isImpostor ? AppColors.impostor : AppColors.primary,
+                                color: isImpostor
+                                    ? AppColors.impostor
+                                    : AppColors.primary,
                               ),
                             ),
                           ],
@@ -222,7 +231,6 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
                       ],
                     ),
                   ),
-
                 if (_revealed) ...[
                   const SizedBox(height: 24),
                   SizedBox(
@@ -271,7 +279,8 @@ class _RoleRevealScreenState extends State<RoleRevealScreen> {
           children: [
             Text(
               '¡Todos listos!',
-              style: AppTheme.displayStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              style: AppTheme.displayStyle(
+                  fontSize: 28, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
             Text(

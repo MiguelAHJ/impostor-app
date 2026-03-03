@@ -63,7 +63,8 @@ class CancelGameButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton.icon(
       onPressed: () => _confirm(context),
-      icon: const Icon(Icons.exit_to_app, size: 16, color: AppColors.mutedForeground),
+      icon: const Icon(Icons.exit_to_app,
+          size: 16, color: AppColors.mutedForeground),
       label: Text(
         'Cancelar partida',
         style: AppTheme.bodyStyle(
