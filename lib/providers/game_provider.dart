@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player.dart';
 import '../models/word_entry.dart';
-import '../data/words.dart';
+import '../services/api_service.dart';
 
-enum GamePhase { setup, reveal, playing, voting, elimination, result }
+enum GamePhase { setup, loading, reveal, playing, voting, elimination, result }
 
 class GameProvider extends ChangeNotifier {
   GamePhase _phase = GamePhase.setup;
@@ -19,8 +19,8 @@ class GameProvider extends ChangeNotifier {
   bool _showRoleOnElimination = false;
   bool _impostorHasClue = true;
   int _lastEliminatedIndex = -1;
+  String? _loadingError;
 
-  static const _usedIdsKey = 'party-game-used-ids';
   static const _lastNamesKey = 'party-game-last-names';
   static const _lastImpostorsKey = 'party-game-last-impostors';
   static const _lastShowRoleKey = 'party-game-last-show-role';
@@ -60,49 +60,13 @@ class GameProvider extends ChangeNotifier {
   bool get showRoleOnElimination => _showRoleOnElimination;
   bool get impostorHasClue => _impostorHasClue;
   int get lastEliminatedIndex => _lastEliminatedIndex;
+  String? get loadingError => _loadingError;
   List<Player> get alivePlayers => _players.where((p) => p.alive).toList();
 
-  Future<List<int>> _getUsedIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_usedIdsKey);
-    if (raw == null) return [];
-    return raw.map((e) => int.tryParse(e) ?? 0).toList();
-  }
-
-  Future<void> _saveUsedIds(List<int> ids) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-        _usedIdsKey, ids.map((e) => e.toString()).toList());
-  }
-
   Future<({WordEntry word, String clue})> _pickWord() async {
-    var usedIds = await _getUsedIds();
-    var available = wordsData.where((w) => !usedIds.contains(w.id)).toList();
-
-    if (available.isEmpty) {
-      usedIds = [];
-      await _saveUsedIds([]);
-      available = List.from(wordsData);
-    }
-
-    final word = available[_random.nextInt(available.length)];
+    final word = await ApiService().fetchRandomWord();
     final clue = word.pistaImpostor[_random.nextInt(word.pistaImpostor.length)];
-
-    usedIds.add(word.id);
-    await _saveUsedIds(usedIds);
-
     return (word: word, clue: clue);
-  }
-
-  List<T> _shuffle<T>(List<T> list) {
-    final a = List<T>.from(list);
-    for (var i = a.length - 1; i > 0; i--) {
-      final j = _random.nextInt(i + 1);
-      final temp = a[i];
-      a[i] = a[j];
-      a[j] = temp;
-    }
-    return a;
   }
 
   Future<void> startGame(List<String> names, int impostors,
@@ -116,18 +80,35 @@ class GameProvider extends ChangeNotifier {
 
     _showRoleOnElimination = showRoleOnElimination;
     _impostorHasClue = impostorHasClue;
+    _loadingError = null;
 
-    final result = await _pickWord();
-    final shuffledNames = _shuffle(names);
+    // Mostrar pantalla de carga mientras la IA genera la palabra
+    _phase = GamePhase.loading;
+    notifyListeners();
 
-    var players = shuffledNames.asMap().entries.map((entry) {
+    final ({WordEntry word, String clue}) result;
+    try {
+      result = await _pickWord();
+    } catch (e) {
+      _loadingError =
+          'No se pudo conectar al servidor.\nVerifica la IP en api_service.dart y que el backend esté corriendo.';
+      _phase = GamePhase.setup;
+      notifyListeners();
+      return;
+    }
+
+    // Asignar roles aleatoriamente pero conservar el orden de registro.
+    // Se elige al azar qué posiciones serán impostores, sin reordenar la lista.
+    final indices = List.generate(names.length, (i) => i)..shuffle(_random);
+    final impostorIndices = indices.take(impostors).toSet();
+
+    final players = names.asMap().entries.map((entry) {
       return Player(
         name: entry.value,
-        role: entry.key < impostors ? Role.impostor : Role.civil,
+        role: impostorIndices.contains(entry.key) ? Role.impostor : Role.civil,
       );
     }).toList();
 
-    players = _shuffle(players);
     final firstSpeaker = _random.nextInt(players.length);
 
     _phase = GamePhase.reveal;
@@ -207,6 +188,7 @@ class GameProvider extends ChangeNotifier {
     _showRoleOnElimination = false;
     _impostorHasClue = true;
     _lastEliminatedIndex = -1;
+    _loadingError = null;
     notifyListeners();
   }
 }
