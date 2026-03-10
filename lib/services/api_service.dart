@@ -2,10 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/word_entry.dart';
 
-/// IP de tu PC en la red local WiFi.
-/// Cámbialo si cambias de red (corre `ipconfig` y busca el adaptador WiFi).
-/// Si usas emulador Android en vez de teléfono real, usa: 10.0.2.2
-const String _baseUrl = 'http://192.168.1.101:3000/api/v1';
+/// URL del backend en producción (Render)
+const String _baseUrl = 'https://secret-word-social-backend.onrender.com/api/v1';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
