@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/word_entry.dart';
 
-/// URL del backend en producción (Render)
-const String _baseUrl = 'https://secret-word-social-backend.onrender.com/api/v1';
+/// URL del backend en producción (Vercel)
+const String _baseUrl = 'https://secret-word-social-backend.vercel.app/api/v1';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
