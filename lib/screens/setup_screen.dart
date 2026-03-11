@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
@@ -154,43 +156,43 @@ class _SetupScreenState extends State<SetupScreen> {
                 const SizedBox(height: 16),
 
                 // Player inputs
-                ...List.generate(_controllers.length, (i) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _controllers[i],
-                            style: AppTheme.bodyStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: 'Jugador ${i + 1}',
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        if (_controllers.length > 2) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _removePlayer(i),
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondary,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: AppColors.mutedForeground,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                }),
+                ReorderableListView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex--;
+                      final controller = _controllers.removeAt(oldIndex);
+                      _controllers.insert(newIndex, controller);
+                    });
+                  },
+                  proxyDecorator: (child, index, animation) {
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        return Material(
+                          elevation: 10 * animation.value,
+                          color: Colors.transparent,
+                          shadowColor: AppColors.primary.withOpacity(0.35),
+                          borderRadius: BorderRadius.circular(12),
+                          child: child,
+                        );
+                      },
+                      child: child,
+                    );
+                  },
+                  children: List.generate(_controllers.length, (i) {
+                    return _PlayerShakeRow(
+                      key: ValueKey(_controllers[i]),
+                      index: i,
+                      controller: _controllers[i],
+                      canRemove: _controllers.length > 2,
+                      onRemove: () => _removePlayer(i),
+                      onChanged: () => setState(() {}),
+                    );
+                  }),
+                ),
 
                 // Add player button
                 const SizedBox(height: 4),
@@ -391,6 +393,159 @@ class _SetupScreenState extends State<SetupScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PlayerShakeRow extends StatefulWidget {
+  final int index;
+  final TextEditingController controller;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _PlayerShakeRow({
+    required super.key,
+    required this.index,
+    required this.controller,
+    required this.canRemove,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  State<_PlayerShakeRow> createState() => _PlayerShakeRowState();
+}
+
+class _PlayerShakeRowState extends State<_PlayerShakeRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shakeController;
+  late final Animation<double> _shakeAnim;
+  final FocusNode _focusNode = FocusNode();
+  Timer? _holdTimer;
+  bool _isHeld = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(_shakeController);
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    _focusNode.dispose();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  void _onPointerDown(PointerDownEvent _) {
+    _holdTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      setState(() => _isHeld = true);
+      _shakeController.forward(from: 0).then((_) {
+        if (mounted) setState(() => _isHeld = false);
+      });
+    });
+  }
+
+  void _onPointerUp(PointerUpEvent _) {
+    _holdTimer?.cancel();
+    if (mounted && _isHeld) setState(() => _isHeld = false);
+  }
+
+  void _onPointerCancel(PointerCancelEvent _) {
+    _holdTimer?.cancel();
+    if (mounted && _isHeld) setState(() => _isHeld = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shakeAnim,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: _isHeld
+              ? AppColors.primary.withOpacity(0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: _isHeld
+              ? Border.all(
+                  color: AppColors.primary.withOpacity(0.4),
+                  width: 1.5,
+                )
+              : Border.all(color: Colors.transparent, width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  // TextField no recibe toques directamente
+                  TextField(
+                    focusNode: _focusNode,
+                    controller: widget.controller,
+                    style: AppTheme.bodyStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Jugador ${widget.index + 1}',
+                    ),
+                    onChanged: (_) => widget.onChanged(),
+                  ),
+                  // Capa invisible encima que intercepta todos los toques
+                  Positioned.fill(
+                    child: Listener(
+                      onPointerDown: _onPointerDown,
+                      onPointerUp: _onPointerUp,
+                      onPointerCancel: _onPointerCancel,
+                      behavior: HitTestBehavior.opaque,
+                      child: ReorderableDelayedDragStartListener(
+                        index: widget.index,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          // Toque rápido → enfoca el TextField manualmente
+                          onTap: () => _focusNode.requestFocus(),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.canRemove) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: widget.onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      builder: (context, child) {
+        final shake = math.sin(_shakeAnim.value * math.pi * 7) * 2.5;
+        return Transform.translate(
+          offset: Offset(shake, 0),
+          child: child,
+        );
+      },
     );
   }
 }
