@@ -19,6 +19,8 @@ class GameProvider extends ChangeNotifier {
   bool _showRoleOnElimination = false;
   bool _impostorHasClue = true;
   int _lastEliminatedIndex = -1;
+  bool _timerExpired = false;
+  int _elapsedSeconds = 0;
   String? _loadingError;
 
   static const _lastNamesKey = 'party-game-last-names';
@@ -60,6 +62,8 @@ class GameProvider extends ChangeNotifier {
   bool get showRoleOnElimination => _showRoleOnElimination;
   bool get impostorHasClue => _impostorHasClue;
   int get lastEliminatedIndex => _lastEliminatedIndex;
+  bool get timerExpired => _timerExpired;
+  int get elapsedSeconds => _elapsedSeconds;
   String? get loadingError => _loadingError;
   List<Player> get alivePlayers => _players.where((p) => p.alive).toList();
 
@@ -132,8 +136,15 @@ class GameProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startVoting() {
+  void startVoting({bool timerExpired = false, int elapsedSeconds = 0}) {
+    _timerExpired = timerExpired;
+    _elapsedSeconds = elapsedSeconds;
     _phase = GamePhase.voting;
+    notifyListeners();
+  }
+
+  void backToPlaying() {
+    _phase = GamePhase.playing;
     notifyListeners();
   }
 
@@ -146,14 +157,9 @@ class GameProvider extends ChangeNotifier {
     }).toList();
     _lastEliminatedIndex = index;
 
-    if (_showRoleOnElimination) {
-      // Pause to show elimination reveal screen before resolving win condition
-      _phase = GamePhase.elimination;
-      notifyListeners();
-      return;
-    }
-
-    _resolveAfterElimination();
+    // Always show elimination screen (with or without role reveal)
+    _phase = GamePhase.elimination;
+    notifyListeners();
   }
 
   /// Called by EliminationRevealScreen after the countdown finishes.
@@ -188,6 +194,8 @@ class GameProvider extends ChangeNotifier {
     _showRoleOnElimination = false;
     _impostorHasClue = true;
     _lastEliminatedIndex = -1;
+    _timerExpired = false;
+    _elapsedSeconds = 0;
     _loadingError = null;
     notifyListeners();
   }

@@ -1,6 +1,5 @@
-import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../theme/app_theme.dart';
@@ -13,14 +12,13 @@ class SetupScreen extends StatefulWidget {
 }
 
 class _SetupScreenState extends State<SetupScreen> {
-  final List<TextEditingController> _controllers = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  int _impostors = 1;
+  final List<String> _playerNames = [];
+  int _impostorCount = 1;
   bool _showRoleOnElimination = false;
   bool _impostorHasClue = true;
   String _error = '';
+
+  static const int _maxPlayers = 8;
 
   @override
   void initState() {
@@ -28,71 +26,62 @@ class _SetupScreenState extends State<SetupScreen> {
     GameProvider.loadLastSession().then((session) {
       if (session == null || !mounted) return;
       setState(() {
-        for (final c in _controllers) {
-          c.dispose();
-        }
-        _controllers
+        _playerNames
           ..clear()
-          ..addAll(session.names.map((n) => TextEditingController(text: n)));
-        _impostors = session.impostors;
+          ..addAll(session.names);
+        _impostorCount = session.impostors;
         _showRoleOnElimination = session.showRole;
         _impostorHasClue = session.impostorHasClue;
       });
     });
   }
 
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _addPlayer() {
-    setState(() {
-      _controllers.add(TextEditingController());
-    });
-  }
-
-  void _removePlayer(int index) {
-    if (_controllers.length <= 2) return;
-    setState(() {
-      _controllers[index].dispose();
-      _controllers.removeAt(index);
-    });
-  }
-
   int get _maxImpostors {
-    final validCount =
-        _controllers.where((c) => c.text.trim().isNotEmpty).length;
-    return ((validCount - 1) / 2).floor().clamp(1, 10);
+    final count = _playerNames.length;
+    return ((count - 1) / 2).floor().clamp(1, 10);
+  }
+
+  void _openPlayersModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PlayersModal(
+        names: List.from(_playerNames),
+        maxPlayers: _maxPlayers,
+        onSave: (names) {
+          setState(() {
+            _playerNames
+              ..clear()
+              ..addAll(names);
+            if (_impostorCount > _maxImpostors) {
+              _impostorCount = _maxImpostors;
+            }
+          });
+        },
+      ),
+    );
   }
 
   void _handleStart() {
-    final names = _controllers
-        .map((c) => c.text.trim())
-        .where((n) => n.isNotEmpty)
-        .toList();
-
-    if (names.length < 3) {
+    if (_playerNames.length < 3) {
       setState(() => _error = 'Se necesitan al menos 3 jugadores');
       return;
     }
-    if (names.toSet().length != names.length) {
+    if (_playerNames.toSet().length != _playerNames.length) {
       setState(() => _error = 'Los nombres deben ser únicos');
       return;
     }
-    final civils = names.length - _impostors;
-    if (_impostors >= civils) {
+    final civils = _playerNames.length - _impostorCount;
+    if (_impostorCount >= civils) {
       setState(() => _error = 'Los impostores deben ser menos que los civiles');
       return;
     }
 
     setState(() => _error = '');
     context.read<GameProvider>().startGame(
-          names,
-          _impostors,
+          _playerNames,
+          _impostorCount,
           showRoleOnElimination: _showRoleOnElimination,
           impostorHasClue: _impostorHasClue,
         );
@@ -100,452 +89,920 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.lightBg1,
+            AppColors.lightBg2,
+            AppColors.lightBg3,
+          ],
+        ),
+      ),
       child: Column(
         children: [
-          // Title
-          Text(
-            'IMPOSTOR',
-            style: AppTheme.displayStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
+          // App Bar
+          Padding(
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 16,
+              right: 16,
+              bottom: 12,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '¿Quién es el impostor entre nosotros?',
-            style: AppTheme.bodyStyle(
-              fontSize: 13,
-              color: AppColors.mutedForeground,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Card
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E1F30), Color(0xFF18192A)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                // Players header
-                Row(
-                  children: [
-                    const Icon(Icons.people,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Jugadores',
-                      style: AppTheme.displayStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Player inputs
-                ReorderableListView(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) newIndex--;
-                      final controller = _controllers.removeAt(oldIndex);
-                      _controllers.insert(newIndex, controller);
-                    });
-                  },
-                  proxyDecorator: (child, index, animation) {
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        return Material(
-                          elevation: 10 * animation.value,
-                          color: Colors.transparent,
-                          shadowColor: AppColors.primary.withOpacity(0.35),
-                          borderRadius: BorderRadius.circular(12),
-                          child: child,
-                        );
-                      },
-                      child: child,
-                    );
-                  },
-                  children: List.generate(_controllers.length, (i) {
-                    return _PlayerShakeRow(
-                      key: ValueKey(_controllers[i]),
-                      index: i,
-                      controller: _controllers[i],
-                      canRemove: _controllers.length > 2,
-                      onRemove: () => _removePlayer(i),
-                      onChanged: () => setState(() {}),
-                    );
-                  }),
-                ),
-
-                // Add player button
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: _addPlayer,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.border,
-                        style: BorderStyle.solid,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.add,
-                            size: 16, color: AppColors.mutedForeground),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Añadir jugador',
-                          style: AppTheme.bodyStyle(
-                            fontSize: 13,
-                            color: AppColors.mutedForeground,
-                          ),
-                        ),
-                      ],
+                const SizedBox(width: 40),
+                Expanded(
+                  child: Text(
+                    'Game Setup',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.darkText,
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // Impostors
-                Row(
-                  children: [
-                    const Icon(Icons.dangerous,
-                        color: AppColors.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Impostores',
-                      style: AppTheme.displayStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: List.generate(_maxImpostors, (i) {
-                    final n = i + 1;
-                    final isSelected = _impostors == n;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _impostors = n),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.accent
-                                : AppColors.secondary,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                        color:
-                                            AppColors.accent.withOpacity(0.3),
-                                        blurRadius: 20)
-                                  ]
-                                : null,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '$n',
-                            style: AppTheme.displayStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected
-                                  ? AppColors.accentForeground
-                                  : AppColors.mutedForeground,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-
-                // Show role on elimination toggle
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Icon(Icons.visibility,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Mostrar rol al eliminar',
-                        style: AppTheme.displayStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Switch(
-                      value: _showRoleOnElimination,
-                      onChanged: (val) =>
-                          setState(() => _showRoleOnElimination = val),
-                      activeColor: AppColors.primary,
-                    ),
-                  ],
-                ),
-                Text(
-                  _showRoleOnElimination
-                      ? 'Al eliminar un jugador se mostrará su rol'
-                      : 'El rol del eliminado permanece oculto',
-                  style: AppTheme.bodyStyle(
-                    fontSize: 12,
-                    color: AppColors.mutedForeground,
-                  ),
-                ),
-
-                // Impostor clue toggle
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Icon(Icons.lightbulb_outline,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pista para el impostor',
-                        style: AppTheme.displayStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Switch(
-                      value: _impostorHasClue,
-                      onChanged: (val) =>
-                          setState(() => _impostorHasClue = val),
-                      activeColor: AppColors.primary,
-                    ),
-                  ],
-                ),
-                Text(
-                  _impostorHasClue
-                      ? 'El impostor recibe una pista relacionada'
-                      : 'El impostor no recibe ninguna pista',
-                  style: AppTheme.bodyStyle(
-                    fontSize: 12,
-                    color: AppColors.mutedForeground,
-                  ),
-                ),
-
-                // Error
-                if (_error.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    _error,
-                    style: AppTheme.bodyStyle(
-                        fontSize: 13, color: AppColors.accent),
-                  ),
-                ],
-
-                const SizedBox(height: 20),
-
-                // Start button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _handleStart,
-                    icon: const Icon(Icons.play_arrow, size: 20),
-                    label: const Text('Iniciar Partida'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.primaryForeground,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ).copyWith(
-                      shadowColor: WidgetStateProperty.all(
-                          AppColors.primary.withOpacity(0.3)),
-                    ),
-                  ),
-                ),
+                _appBarButton(Icons.settings, onTap: () {}),
               ],
+            ),
+          ),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  _buildPlayersCard(),
+                  const SizedBox(height: 16),
+                  _buildGameRulesCard(),
+                  const SizedBox(height: 24),
+                  if (_error.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        _error,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 13,
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  _buildStartButton(),
+                  const SizedBox(height: 12),
+                  Text(
+                    _playerNames.length < 3
+                        ? 'MÍNIMO 3 JUGADORES REQUERIDOS'
+                        : '${_playerNames.length} JUGADORES LISTOS',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _PlayerShakeRow extends StatefulWidget {
-  final int index;
-  final TextEditingController controller;
-  final bool canRemove;
-  final VoidCallback onRemove;
-  final VoidCallback onChanged;
-
-  const _PlayerShakeRow({
-    required super.key,
-    required this.index,
-    required this.controller,
-    required this.canRemove,
-    required this.onRemove,
-    required this.onChanged,
-  });
-
-  @override
-  State<_PlayerShakeRow> createState() => _PlayerShakeRowState();
-}
-
-class _PlayerShakeRowState extends State<_PlayerShakeRow>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _shakeController;
-  late final Animation<double> _shakeAnim;
-  final FocusNode _focusNode = FocusNode();
-  Timer? _holdTimer;
-  bool _isHeld = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _shakeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 450),
-    );
-    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(_shakeController);
-  }
-
-  @override
-  void dispose() {
-    _holdTimer?.cancel();
-    _focusNode.dispose();
-    _shakeController.dispose();
-    super.dispose();
-  }
-
-  void _onPointerDown(PointerDownEvent _) {
-    _holdTimer = Timer(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      setState(() => _isHeld = true);
-      _shakeController.forward(from: 0).then((_) {
-        if (mounted) setState(() => _isHeld = false);
-      });
-    });
-  }
-
-  void _onPointerUp(PointerUpEvent _) {
-    _holdTimer?.cancel();
-    if (mounted && _isHeld) setState(() => _isHeld = false);
-  }
-
-  void _onPointerCancel(PointerCancelEvent _) {
-    _holdTimer?.cancel();
-    if (mounted && _isHeld) setState(() => _isHeld = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _shakeAnim,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.only(bottom: 8),
+  Widget _appBarButton(IconData icon, {required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: _isHeld
-              ? AppColors.primary.withOpacity(0.08)
-              : Colors.transparent,
+          color: Colors.white.withValues(alpha:0.7),
           borderRadius: BorderRadius.circular(12),
-          border: _isHeld
-              ? Border.all(
-                  color: AppColors.primary.withOpacity(0.4),
-                  width: 1.5,
-                )
-              : Border.all(color: Colors.transparent, width: 1.5),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  // TextField no recibe toques directamente
-                  TextField(
-                    focusNode: _focusNode,
-                    controller: widget.controller,
-                    style: AppTheme.bodyStyle(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Jugador ${widget.index + 1}',
-                    ),
-                    onChanged: (_) => widget.onChanged(),
-                  ),
-                  // Capa invisible encima que intercepta todos los toques
-                  Positioned.fill(
-                    child: Listener(
-                      onPointerDown: _onPointerDown,
-                      onPointerUp: _onPointerUp,
-                      onPointerCancel: _onPointerCancel,
-                      behavior: HitTestBehavior.opaque,
-                      child: ReorderableDelayedDragStartListener(
-                        index: widget.index,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          // Toque rápido → enfoca el TextField manualmente
-                          onTap: () => _focusNode.requestFocus(),
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        child: Icon(icon, color: AppColors.darkText, size: 20),
+      ),
+    );
+  }
+
+  // ── Players Card ──────────────────────────────────────────────────────
+
+  Widget _buildPlayersCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Text(
+                'Jugadores',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkText,
+                ),
               ),
-            ),
-            if (widget.canRemove) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: widget.onRemove,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    size: 16,
-                    color: AppColors.mutedForeground,
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.blue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_maxPlayers MAX',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Input area → opens modal
+          GestureDetector(
+            onTap: _openPlayersModal,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightInputBg,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Gestionar jugadores...',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(Icons.person_add_outlined,
+                            color: Colors.grey.shade400, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.blue,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 24),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Player avatars (horizontal scroll)
+          SizedBox(
+            height: 80,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _maxPlayers,
+              itemBuilder: (ctx, i) {
+                if (i < _playerNames.length) {
+                  return _buildPlayerAvatar(i);
+                }
+                return _buildEmptySlot();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerAvatar(int index) {
+    final name = _playerNames[index];
+    final color = AppColors.avatarColors[index % AppColors.avatarColors.length];
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha:0.25),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2.5),
+            ),
+            child: Icon(Icons.person, color: color, size: 28),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 58,
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.darkText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptySlot() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade300, width: 1.5),
+            ),
+            child: Icon(Icons.add, color: Colors.grey.shade300, size: 22),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Vacío',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Game Rules Card ───────────────────────────────────────────────────
+
+  Widget _buildGameRulesCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              const Icon(Icons.tune, color: AppColors.blue, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Configuración',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkText,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Impostor count header
+          Row(
+            children: [
+              Text(
+                'Cantidad de Impostores',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: AppColors.blue,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$_impostorCount',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // Slider
+          if (_maxImpostors > 1) ...[
+            SliderTheme(
+              data: SliderThemeData(
+                activeTrackColor: AppColors.blue,
+                inactiveTrackColor: Colors.grey.shade200,
+                thumbColor: AppColors.blue,
+                overlayColor: AppColors.blue.withValues(alpha:0.1),
+                trackHeight: 6,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 10),
+              ),
+              child: Slider(
+                value: _impostorCount.toDouble(),
+                min: 1,
+                max: _maxImpostors.toDouble(),
+                divisions: _maxImpostors - 1,
+                onChanged: (val) =>
+                    setState(() => _impostorCount = val.round()),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(_maxImpostors, (i) {
+                  return Text(
+                    '${i + 1}',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'Agrega más jugadores para poder ajustar',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12,
+                  color: Colors.grey.shade400,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 20),
+          Divider(color: Colors.grey.shade200, height: 1),
+          const SizedBox(height: 16),
+
+          // Toggle: Show role on elimination
+          _buildToggleRow(
+            icon: Icons.visibility_outlined,
+            iconBgColor: const Color(0xFFE8F5E9),
+            iconColor: const Color(0xFF4CAF50),
+            title: 'Mostrar rol al eliminar',
+            subtitle: _showRoleOnElimination
+                ? 'Se mostrará el rol del eliminado'
+                : 'El rol del eliminado permanece oculto',
+            value: _showRoleOnElimination,
+            onChanged: (val) => setState(() => _showRoleOnElimination = val),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Toggle: Impostor clue
+          _buildToggleRow(
+            icon: Icons.lightbulb_outline,
+            iconBgColor: const Color(0xFFFFF3E0),
+            iconColor: const Color(0xFFFF9800),
+            title: 'Pista para el impostor',
+            subtitle: _impostorHasClue
+                ? 'El impostor recibe una pista relacionada'
+                : 'El impostor no recibe ninguna pista',
+            value: _impostorHasClue,
+            onChanged: (val) => setState(() => _impostorHasClue = val),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleRow({
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconBgColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _AnimatedSwitch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
+  // ── Start Button ──────────────────────────────────────────────────────
+
+  Widget _buildStartButton() {
+    final canStart = _playerNames.length >= 3;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: canStart ? _handleStart : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.blue,
+          disabledBackgroundColor: AppColors.blue.withValues(alpha:0.4),
+          foregroundColor: Colors.white,
+          disabledForegroundColor: Colors.white.withValues(alpha:0.7),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: canStart ? 4 : 0,
+          shadowColor: AppColors.blue.withValues(alpha:0.3),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'INICIAR PARTIDA',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_rounded,
+              size: 20,
+              color: canStart ? Colors.white : Colors.white.withValues(alpha: 0.7),
+            ),
           ],
         ),
       ),
-      builder: (context, child) {
-        final shake = math.sin(_shakeAnim.value * math.pi * 7) * 2.5;
-        return Transform.translate(
-          offset: Offset(shake, 0),
-          child: child,
-        );
-      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Players Modal (Bottom Sheet)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _PlayersModal extends StatefulWidget {
+  final List<String> names;
+  final int maxPlayers;
+  final ValueChanged<List<String>> onSave;
+
+  const _PlayersModal({
+    required this.names,
+    required this.maxPlayers,
+    required this.onSave,
+  });
+
+  @override
+  State<_PlayersModal> createState() => _PlayersModalState();
+}
+
+class _PlayersModalState extends State<_PlayersModal> {
+  late final List<_PlayerEntry> _entries;
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  int _nextId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _entries = widget.names.map((n) => _PlayerEntry(_nextId++, n)).toList();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _addPlayer() {
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+    if (_entries.length >= widget.maxPlayers) return;
+    if (_entries.any((e) => e.name == name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Este nombre ya existe'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _entries.add(_PlayerEntry(_nextId++, name));
+      _controller.clear();
+    });
+    _focusNode.requestFocus();
+  }
+
+  void _removePlayer(int index) {
+    setState(() => _entries.removeAt(index));
+  }
+
+  void _save() {
+    widget.onSave(_entries.map((e) => e.name).toList());
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.80,
+      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+            child: Row(
+              children: [
+                Text(
+                  'Jugadores',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.darkText,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _save,
+                  child: Text(
+                    'Listo',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Add player input
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    autofocus: true,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: AppColors.darkText,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Nombre del jugador...',
+                      hintStyle: GoogleFonts.spaceGrotesk(
+                        color: Colors.grey.shade400,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.lightInputBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                    ),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _addPlayer(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _addPlayer,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: _entries.length < widget.maxPlayers
+                          ? AppColors.blue
+                          : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child:
+                        const Icon(Icons.add, color: Colors.white, size: 24),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Player count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Text(
+                  '${_entries.length}/${widget.maxPlayers} jugadores',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const Spacer(),
+                if (_entries.isNotEmpty)
+                  Text(
+                    'Mantén ≡ para reordenar',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      color: Colors.grey.shade400,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Player list
+          Flexible(
+            child: _entries.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people_outline,
+                              size: 48, color: Colors.grey.shade300),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Agrega jugadores para empezar',
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 14,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ReorderableListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    buildDefaultDragHandles: false,
+                    itemCount: _entries.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) newIndex--;
+                        final entry = _entries.removeAt(oldIndex);
+                        _entries.insert(newIndex, entry);
+                      });
+                    },
+                    proxyDecorator: (child, index, animation) {
+                      return Material(
+                        elevation: 8,
+                        color: Colors.transparent,
+                        shadowColor: AppColors.blue.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        child: child,
+                      );
+                    },
+                    itemBuilder: (ctx, i) {
+                      final entry = _entries[i];
+                      final color = AppColors
+                          .avatarColors[i % AppColors.avatarColors.length];
+
+                      return Container(
+                        key: ValueKey(entry.id),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F8FC),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha:0.25),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: color, width: 2),
+                              ),
+                              child: Icon(Icons.person,
+                                  color: color, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            // Name
+                            Expanded(
+                              child: Text(
+                                entry.name,
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.darkText,
+                                ),
+                              ),
+                            ),
+                            // Delete
+                            GestureDetector(
+                              onTap: () => _removePlayer(i),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(Icons.close,
+                                    size: 18, color: Colors.grey.shade400),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Drag handle
+                            ReorderableDragStartListener(
+                              index: i,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(Icons.drag_handle,
+                                    size: 20, color: Colors.grey.shade400),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
+      ),
+    );
+  }
+}
+
+// Simple data class for stable keys in ReorderableListView
+class _PlayerEntry {
+  final int id;
+  final String name;
+  _PlayerEntry(this.id, this.name);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Custom Animated Switch
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _AnimatedSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _AnimatedSwitch({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        width: 52,
+        height: 30,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          color: value ? AppColors.teal : const Color(0xFFD5D5DC),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x29000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 class LoadingScreen extends StatefulWidget {
@@ -9,31 +10,32 @@ class LoadingScreen extends StatefulWidget {
 }
 
 class _LoadingScreenState extends State<LoadingScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulseAnimation;
+    with TickerProviderStateMixin {
+  late AnimationController _dotController;
+  late AnimationController _glowController;
 
   final List<String> _messages = [
-    'Consultando a la IA...',
-    'Generando la palabra secreta...',
-    'Preparando el juego...',
-    'Casi listo...',
+    'Consultando a la IA',
+    'Generando palabra secreta',
+    'Preparando la partida',
+    'Casi listo',
   ];
   int _messageIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    _dotController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
-    // Rotate through the messages every 2.5 seconds
     Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 2500));
       if (!mounted) return false;
@@ -46,75 +48,152 @@ class _LoadingScreenState extends State<LoadingScreen>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _dotController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.psychology_outlined,
-                  size: 52,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 36),
-            Text(
-              'IMPOSTOR',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primary,
-                letterSpacing: 6,
-              ),
-            ),
-            const SizedBox(height: 16),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              child: Text(
-                _messages[_messageIndex],
-                key: ValueKey(_messageIndex),
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.mutedForeground,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: 200,
-              child: LinearProgressIndicator(
-                backgroundColor: AppColors.secondary,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ],
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.lightBg1, AppColors.lightBg2, AppColors.lightBg3],
         ),
       ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated glow circle with icon
+              AnimatedBuilder(
+                animation: _glowController,
+                builder: (context, child) {
+                  final glow = Curves.easeInOut
+                      .transform(_glowController.value);
+                  return Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.blue.withValues(alpha: 0.06 + glow * 0.06),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.blue.withValues(alpha: 0.08 + glow * 0.12),
+                          blurRadius: 40 + glow * 20,
+                          spreadRadius: glow * 8,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.cardWhite,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.blue.withValues(alpha: 0.15),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          size: 32,
+                          color: AppColors.blue,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 40),
+
+              // Message with animated dots
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: Row(
+                  key: ValueKey(_messageIndex),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _messages[_messageIndex],
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.darkText,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    _AnimatedDots(controller: _dotController),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Progress bar
+              SizedBox(
+                width: 180,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    backgroundColor: AppColors.blue.withValues(alpha: 0.12),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(AppColors.blue),
+                    minHeight: 4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedDots extends StatelessWidget {
+  final AnimationController controller;
+
+  const _AnimatedDots({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final value = controller.value;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final delay = i * 0.25;
+            final opacity =
+                ((value - delay) % 1.0).clamp(0.0, 0.5) * 2;
+            return Opacity(
+              opacity: opacity,
+              child: Text(
+                '.',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkText,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

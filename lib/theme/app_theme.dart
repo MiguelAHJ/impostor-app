@@ -25,6 +25,29 @@ class AppColors {
 
   // Border
   static const border = Color(0xFF2A2B3D);
+
+  // Light theme colors
+  static const lightBg1 = Color(0xFFF8F0FF);
+  static const lightBg2 = Color(0xFFEDE4FF);
+  static const lightBg3 = Color(0xFFE8DEFF);
+  static const cardWhite = Color(0xFFFFFFFF);
+  static const blue = Color(0xFF5B8DEF);
+  static const darkText = Color(0xFF1E1E2E);
+  static const subtitleText = Color(0xFF9E9EB0);
+  static const lightInputBg = Color(0xFFF5F5F8);
+  static const lightBorder = Color(0xFFE8E8F0);
+  static const teal = Color(0xFF4ECDC4);
+
+  static const avatarColors = [
+    Color(0xFFFF8A80),
+    Color(0xFF82B1FF),
+    Color(0xFFB388FF),
+    Color(0xFFFFD180),
+    Color(0xFF80CBC4),
+    Color(0xFFF48FB1),
+    Color(0xFFA5D6A7),
+    Color(0xFFFFE082),
+  ];
 }
 
 class AppTheme {
