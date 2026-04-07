@@ -15,6 +15,7 @@ class RoleRevealScreen extends StatefulWidget {
 class _RoleRevealScreenState extends State<RoleRevealScreen>
     with SingleTickerProviderStateMixin {
   double _dragOffset = 0;
+  bool _hasRevealed = false;
   late AnimationController _springController;
   late Animation<double> _springAnimation;
 
@@ -43,6 +44,7 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
     setState(() {
       _dragOffset += details.delta.dy;
       if (_dragOffset > 0) _dragOffset = 0;
+      if (_dragOffset <= -150) _hasRevealed = true;
     });
   }
 
@@ -58,7 +60,10 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
   }
 
   void _handleNext() {
-    setState(() => _dragOffset = 0);
+    setState(() {
+      _dragOffset = 0;
+      _hasRevealed = false;
+    });
     _springController.stop();
     context.read<GameProvider>().nextReveal();
   }
@@ -238,7 +243,7 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
                         child: GestureDetector(
                           onVerticalDragUpdate: _onDragUpdate,
                           onVerticalDragEnd: _onDragEnd,
-                          child: _buildCoverCard(),
+                          child: _buildCoverCard(player.name),
                         ),
                       ),
                     ),
@@ -257,21 +262,23 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: _handleNext,
+                onPressed: _hasRevealed ? _handleNext : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.blue,
+                  disabledBackgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.grey.shade500,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  elevation: 4,
+                  elevation: _hasRevealed ? 4 : 0,
                   shadowColor: AppColors.blue.withValues(alpha: 0.3),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'PASAR AL SIGUIENTE',
+                      _hasRevealed ? 'PASAR AL SIGUIENTE' : 'DESLIZA PARA CONTINUAR',
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -279,8 +286,10 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded,
-                        size: 20, color: Colors.white),
+                    Icon(
+                      _hasRevealed ? Icons.arrow_forward_rounded : Icons.swipe_up_rounded,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -454,7 +463,7 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
 
   // ── Cover card (on top, drag to reveal) ─────────────────────────────────
 
-  Widget _buildCoverCard() {
+  Widget _buildCoverCard(String playerName) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -533,11 +542,23 @@ class _RoleRevealScreenState extends State<RoleRevealScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                '¿Cuál es tu rol?',
+                'Es el turno de',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.5),
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                playerName.toUpperCase(),
+                textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 2,
                 ),
               ),
               const Spacer(flex: 2),

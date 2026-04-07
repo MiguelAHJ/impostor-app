@@ -4,7 +4,20 @@
       "Bash(flutter analyze:*)",
       "Bash(npx tsc:*)",
       "Bash(npx nest:*)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(npm install:*)",
+      "Bash(flutter pub:*)",
+      "Bash(where avdmanager:*)",
+      "Bash(where emulator:*)",
+      "Bash(flutter emulators:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(flutter devices:*)",
+      "Bash(curl -s --max-time 3 http://localhost:3000/api/v1/words/random)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://secret-word-social-backend.vercel.app/api/v1/words/random)",
+      "Bash(flutter run:*)",
+      "Bash(adb -s RFCW42728PP logcat -d -s flutter)",
+      "Bash(adb -s RFCW42728PP logcat -d)",
+      "Bash(adb -s RFCW42728PP shell input text \"r\")"
     ]
   }
 }

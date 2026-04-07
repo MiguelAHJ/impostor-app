@@ -4,11 +4,50 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player.dart';
 import '../models/word_entry.dart';
 import '../services/api_service.dart';
+import '../services/socket_service.dart';
 
-enum GamePhase { setup, loading, reveal, playing, voting, elimination, result }
+enum GamePhase {
+  modeSelection,
+  onlineName,
+  onlineLobby,
+  setup,
+  loading,
+  reveal,
+  onlineReveal,
+  onlineDiscussion,
+  onlineSuspense,
+  onlineElimination,
+  playing,
+  voting,
+  elimination,
+  result,
+}
+
+enum GameMode { local, onlineVoice, onlineChat }
 
 class GameProvider extends ChangeNotifier {
-  GamePhase _phase = GamePhase.setup;
+  GamePhase _phase = GamePhase.modeSelection;
+  GameMode _gameMode = GameMode.local;
+
+  // ── Online state ──────────────────────────────────────────────────────────
+  String _localPlayerName = '';
+  String _roomCode = '';
+  bool _isHost = false;
+  List<LobbyPlayer> _lobbyPlayers = [];
+  int? _countdown;
+  String? _roomError;
+
+  // Online discussion/voting state
+  List<String> _onlineSpeakingOrder = [];
+  int _onlineDiscussionDeadlineMs = 0;
+  int _onlineVoteCount = 0;
+  int _onlineVoteTotal = 0;
+  String? _myOnlineVote;
+  String? _votingClosedEliminated;
+  String _votingClosedReason = '';
+  Map<String, int> _votingTally = {};
+
+  // ── Game state ────────────────────────────────────────────────────────────
   List<Player> _players = [];
   int _impostorCount = 1;
   WordEntry? _currentWord;
@@ -52,6 +91,13 @@ class GameProvider extends ChangeNotifier {
 
   // Getters
   GamePhase get phase => _phase;
+  GameMode get gameMode => _gameMode;
+  String get localPlayerName => _localPlayerName;
+  String get roomCode => _roomCode;
+  bool get isHost => _isHost;
+  List<LobbyPlayer> get lobbyPlayers => _lobbyPlayers;
+  int? get countdown => _countdown;
+  String? get roomError => _roomError;
   List<Player> get players => _players;
   int get impostorCount => _impostorCount;
   WordEntry? get currentWord => _currentWord;
@@ -66,6 +112,249 @@ class GameProvider extends ChangeNotifier {
   int get elapsedSeconds => _elapsedSeconds;
   String? get loadingError => _loadingError;
   List<Player> get alivePlayers => _players.where((p) => p.alive).toList();
+
+  // Online discussion/voting getters
+  List<String> get onlineSpeakingOrder => _onlineSpeakingOrder;
+  int get onlineDiscussionDeadlineMs => _onlineDiscussionDeadlineMs;
+  int get onlineVoteCount => _onlineVoteCount;
+  int get onlineVoteTotal => _onlineVoteTotal;
+  String? get myOnlineVote => _myOnlineVote;
+  String? get votingClosedEliminated => _votingClosedEliminated;
+  String get votingClosedReason => _votingClosedReason;
+  Map<String, int> get votingTally => _votingTally;
+
+  void selectMode(GameMode mode) {
+    _gameMode = mode;
+    _phase = mode == GameMode.local ? GamePhase.setup : GamePhase.onlineName;
+    notifyListeners();
+  }
+
+  void backToModeSelection() {
+    _phase = GamePhase.modeSelection;
+    _resetOnlineState();
+    notifyListeners();
+  }
+
+  // ── Online flow ─────────────────────────────────────────────────────────
+
+  final _socket = SocketService();
+
+  void _connectSocket() {
+    _socket.connect(SocketCallbacks(
+      onRoomCreated: _handleRoomUpdate,
+      onRoomUpdated: _handleRoomUpdate,
+      onRoomError: (msg) {
+        _roomError = msg;
+        notifyListeners();
+      },
+      onCountdown: (seconds) {
+        _countdown = seconds;
+        notifyListeners();
+      },
+      onCountdownCancelled: () {
+        _countdown = null;
+        notifyListeners();
+      },
+      onGameStarting: (data) {
+        _impostorCount = data.impostorCount;
+        _showRoleOnElimination = data.showRoleOnElimination;
+        _impostorHasClue = data.impostorHasClue;
+        _currentWord = WordEntry(
+          id: 0,
+          dificultad: Difficulty.facil,
+          palabraReal: data.word,
+          pistaImpostor: [data.clue],
+        );
+        _impostorClue = data.clue;
+        _players = data.assignments.map((a) => Player(
+              name: a.name,
+              role: a.role == 'impostor' ? Role.impostor : Role.civil,
+            )).toList();
+        _firstSpeakerIndex = _players.indexWhere((p) => p.name == data.firstSpeaker);
+        if (_firstSpeakerIndex < 0) _firstSpeakerIndex = 0;
+        _roundNumber = 1;
+        _countdown = null;
+        _phase = GamePhase.onlineReveal;
+        notifyListeners();
+      },
+      onDiscussionStarted: (data) {
+        _onlineSpeakingOrder = data.speakingOrder;
+        _onlineDiscussionDeadlineMs = data.deadlineMs;
+        _onlineVoteCount = 0;
+        _onlineVoteTotal = _players.where((p) => p.alive).length;
+        _myOnlineVote = null;
+        _roundNumber = data.roundNumber;
+        _phase = GamePhase.onlineDiscussion;
+        notifyListeners();
+      },
+      onVoteUpdate: (votedCount, totalCount) {
+        _onlineVoteCount = votedCount;
+        _onlineVoteTotal = totalCount;
+        notifyListeners();
+      },
+      onVotingClosed: (data) {
+        _votingClosedEliminated = data.eliminated;
+        _votingClosedReason = data.reason;
+        _votingTally = data.tally;
+        if (data.eliminated != null) {
+          final idx = _players.indexWhere((p) => p.name == data.eliminated);
+          if (idx >= 0) {
+            _players = _players.asMap().entries.map((e) {
+              if (e.key == idx) return e.value.copyWith(alive: false);
+              return e.value;
+            }).toList();
+            _lastEliminatedIndex = idx;
+          }
+        }
+        _phase = GamePhase.onlineSuspense;
+        notifyListeners();
+      },
+      onRoomReset: (room) {
+        _handleRoomUpdate(room);
+      },
+      onRoomLeft: () {
+        _phase = GamePhase.onlineName;
+        _resetOnlineState();
+        notifyListeners();
+      },
+    ));
+  }
+
+  void _handleRoomUpdate(RoomState room) {
+    _roomCode = room.code;
+    _lobbyPlayers = room.players;
+    _impostorCount = room.settings.impostorCount;
+    _showRoleOnElimination = room.settings.showRoleOnElimination;
+    _impostorHasClue = room.settings.impostorHasClue;
+    _countdown = room.countdown;
+    _isHost = room.players.any((p) => p.name == _localPlayerName && p.isHost);
+    _roomError = null;
+
+    if (_phase != GamePhase.onlineLobby) {
+      _phase = GamePhase.onlineLobby;
+    }
+    notifyListeners();
+  }
+
+  void createRoom(String playerName) {
+    _localPlayerName = playerName;
+    _roomError = null;
+    _connectSocket();
+    // Small delay to ensure socket is connected before emitting
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _socket.createRoom(playerName);
+    });
+  }
+
+  void joinRoom(String playerName, String code) {
+    _localPlayerName = playerName;
+    _roomError = null;
+    _connectSocket();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _socket.joinRoom(code, playerName);
+    });
+  }
+
+  void backToOnlineName() {
+    _socket.leaveRoom();
+    _socket.disconnect();
+    _phase = GamePhase.onlineName;
+    _resetOnlineState();
+    notifyListeners();
+  }
+
+  void updateLobbySettings({int? impostors, bool? showRole, bool? hasClue}) {
+    if (!_isHost) return;
+    final settings = <String, dynamic>{};
+    if (impostors != null) settings['impostorCount'] = impostors;
+    if (showRole != null) settings['showRoleOnElimination'] = showRole;
+    if (hasClue != null) settings['impostorHasClue'] = hasClue;
+    _socket.updateSettings(_roomCode, settings);
+  }
+
+  void toggleReady() {
+    _socket.toggleReady(_roomCode);
+  }
+
+  void clearRoomError() {
+    _roomError = null;
+    notifyListeners();
+  }
+
+  void castOnlineVote(String targetName) {
+    _myOnlineVote = targetName;
+    _socket.castVote(targetName);
+    notifyListeners();
+  }
+
+  void retractOnlineVote() {
+    _myOnlineVote = null;
+    _socket.retractVote();
+    notifyListeners();
+  }
+
+  void closeOnlineVoting() {
+    _socket.closeVoting();
+  }
+
+  /// Called after the suspense screen finishes showing the result.
+  void resolveOnlineSuspense() {
+    if (_votingClosedEliminated != null) {
+      _phase = GamePhase.onlineElimination;
+    } else {
+      // tie or no_votes → new round, compute speaking order locally
+      _startNewOnlineRound();
+    }
+    notifyListeners();
+  }
+
+  /// Called after the online elimination reveal countdown (5s) ends.
+  void resolveOnlineElimination() {
+    final aliveImpostors = _players.where((p) => p.alive && p.role == Role.impostor).length;
+    final aliveCivils = _players.where((p) => p.alive && p.role == Role.civil).length;
+
+    if (aliveImpostors == 0 || aliveImpostors >= aliveCivils) {
+      _phase = GamePhase.result;
+    } else {
+      _startNewOnlineRound();
+    }
+    notifyListeners();
+  }
+
+  void _startNewOnlineRound() {
+    _roundNumber++;
+    _myOnlineVote = null;
+    _onlineVoteCount = 0;
+    final alive = _players.where((p) => p.alive).map((p) => p.name).toList();
+    _onlineVoteTotal = alive.length;
+    final startIdx = _random.nextInt(alive.length);
+    _onlineSpeakingOrder = [...alive.sublist(startIdx), ...alive.sublist(0, startIdx)];
+    _onlineDiscussionDeadlineMs = DateTime.now().millisecondsSinceEpoch + 300000;
+    _phase = GamePhase.onlineDiscussion;
+  }
+
+  void playAgain() {
+    _socket.playAgain();
+    // Transition happens when room_reset is received → _handleRoomUpdate
+  }
+
+  void leaveOnlineGame() {
+    _socket.leaveRoom();
+    _socket.disconnect();
+    _phase = GamePhase.modeSelection;
+    _resetOnlineState();
+    _players = [];
+    notifyListeners();
+  }
+
+  void _resetOnlineState() {
+    _localPlayerName = '';
+    _roomCode = '';
+    _isHost = false;
+    _lobbyPlayers = [];
+    _countdown = null;
+    _roomError = null;
+  }
 
   Future<({WordEntry word, String clue})> _pickWord() async {
     final word = await ApiService().fetchRandomWord();
@@ -176,6 +465,7 @@ class GameProvider extends ChangeNotifier {
     if (aliveImpostors == 0 || aliveImpostors >= aliveCivils) {
       _phase = GamePhase.result;
     } else {
+      _elapsedSeconds = 0;
       _phase = GamePhase.playing;
       _roundNumber++;
     }
@@ -183,7 +473,10 @@ class GameProvider extends ChangeNotifier {
   }
 
   void resetGame() {
-    _phase = GamePhase.setup;
+    _socket.leaveRoom();
+    _socket.disconnect();
+    _phase = GamePhase.modeSelection;
+    _resetOnlineState();
     _players = [];
     _impostorCount = 1;
     _currentWord = null;

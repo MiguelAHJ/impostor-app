@@ -18,8 +18,6 @@ class _SetupScreenState extends State<SetupScreen> {
   bool _impostorHasClue = true;
   String _error = '';
 
-  static const int _maxPlayers = 8;
-
   @override
   void initState() {
     super.initState();
@@ -48,7 +46,6 @@ class _SetupScreenState extends State<SetupScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _PlayersModal(
         names: List.from(_playerNames),
-        maxPlayers: _maxPlayers,
         onSave: (names) {
           setState(() {
             _playerNames
@@ -115,7 +112,9 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
             child: Row(
               children: [
-                const SizedBox(width: 40),
+                _appBarButton(Icons.arrow_back_rounded, onTap: () {
+                  context.read<GameProvider>().backToModeSelection();
+                }),
                 Expanded(
                   child: Text(
                     'Game Setup',
@@ -224,23 +223,6 @@ class _SetupScreenState extends State<SetupScreen> {
                   color: AppColors.darkText,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.blue,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '$_maxPlayers MAX',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
             ],
           ),
 
@@ -296,7 +278,7 @@ class _SetupScreenState extends State<SetupScreen> {
             height: 80,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _maxPlayers,
+              itemCount: _playerNames.length + 1,
               itemBuilder: (ctx, i) {
                 if (i < _playerNames.length) {
                   return _buildPlayerAvatar(i);
@@ -632,12 +614,10 @@ class _SetupScreenState extends State<SetupScreen> {
 
 class _PlayersModal extends StatefulWidget {
   final List<String> names;
-  final int maxPlayers;
   final ValueChanged<List<String>> onSave;
 
   const _PlayersModal({
     required this.names,
-    required this.maxPlayers,
     required this.onSave,
   });
 
@@ -667,7 +647,6 @@ class _PlayersModalState extends State<_PlayersModal> {
   void _addPlayer() {
     final name = _controller.text.trim();
     if (name.isEmpty) return;
-    if (_entries.length >= widget.maxPlayers) return;
     if (_entries.any((e) => e.name == name)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -791,9 +770,7 @@ class _PlayersModalState extends State<_PlayersModal> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: _entries.length < widget.maxPlayers
-                          ? AppColors.blue
-                          : Colors.grey.shade300,
+                      color: AppColors.blue,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child:
@@ -812,7 +789,7 @@ class _PlayersModalState extends State<_PlayersModal> {
             child: Row(
               children: [
                 Text(
-                  '${_entries.length}/${widget.maxPlayers} jugadores',
+                  '${_entries.length} jugadores',
                   style: GoogleFonts.spaceGrotesk(
                     fontSize: 13,
                     color: Colors.grey.shade500,

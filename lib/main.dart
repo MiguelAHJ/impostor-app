@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
+import 'screens/mode_selection_screen.dart';
+import 'screens/online_name_screen.dart';
+import 'screens/online_lobby_screen.dart';
 import 'screens/setup_screen.dart';
 import 'screens/loading_screen.dart';
 import 'screens/role_reveal_screen.dart';
+import 'screens/online_reveal_screen.dart';
+import 'screens/online_discussion_screen.dart';
+import 'screens/online_suspense_screen.dart';
+import 'screens/online_elimination_reveal_screen.dart';
 import 'screens/playing_screen.dart';
 import 'screens/voting_screen.dart';
 import 'screens/elimination_reveal_screen.dart';
@@ -69,12 +76,26 @@ class GameShell extends StatelessWidget {
 
     Widget body;
     switch (phase) {
+      case GamePhase.modeSelection:
+        body = const ModeSelectionScreen();
+      case GamePhase.onlineName:
+        body = const OnlineNameScreen();
+      case GamePhase.onlineLobby:
+        body = const OnlineLobbyScreen();
       case GamePhase.setup:
         body = const SetupScreen();
       case GamePhase.loading:
         body = const LoadingScreen();
       case GamePhase.reveal:
         body = const RoleRevealScreen();
+      case GamePhase.onlineReveal:
+        body = const OnlineRevealScreen();
+      case GamePhase.onlineDiscussion:
+        body = const OnlineDiscussionScreen();
+      case GamePhase.onlineSuspense:
+        body = const OnlineSuspenseScreen();
+      case GamePhase.onlineElimination:
+        body = const OnlineEliminationRevealScreen();
       case GamePhase.playing:
         body = const PlayingScreen();
       case GamePhase.voting:
